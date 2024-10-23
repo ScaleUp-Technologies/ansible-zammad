@@ -1,1 +1,3 @@
-# ansible-zammad
+# Ansible Collection - scaleuptechnologies.zammad
+
+Documentation for the collection.
