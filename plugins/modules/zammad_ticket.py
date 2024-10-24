@@ -5,64 +5,141 @@ __metaclass__ = type
 
 DOCUMENTATION = r'''
 ---
-module: zammad_create_ticket
+author:
+- Scaleup Technologies
+- Melvin Ziemann (@cloucs)
 
-short_description: Creates a zammad ticket via the API
+module: zammad_ticket
+
+short_description: Create, update, close a Zammad ticket via the API
 
 version_added: "1.0.0"
 
-description: This module creates a zammad ticket using the API with user credentials and ticket details passed as parameters.
+description: |
+  This module creates, updates, or closes a Zammad ticket using the API.
+  User credentials and ticket details are passed as parameters. This module can handle
+  ticket creation and updates based on the specified state. It also allows for the
+  closure of existing tickets.
 
 options:
-	title:
-		description: The title of the ticket.
-		required: true
-		type: str
-	group:
-		description: The group handling the ticket.
-		required: true
-		type: str
-	customer:
-		description: The email address of the customer for the ticket.
-		required: true
-		type: str
-	subject:
-		description: The subject for the ticket's article.
-		required: true
-		type: str
-	body:
-		description: The body content for the ticket's article.
-		required: true
-		type: str
-	internal:
-		description: Whether the article is internal or not.
-		required: false 
-		type: bool
-		default: False
-'''
-
-EXAMPLES = r'''
-- name: Create a ticket
-	scaleuptechnologies.utils.zammad_create_ticket:
-		title: "Deleted the internet!"
-		group: "Operations"
-		customer: "example@domain.com"
-		subject: "Internet outage"
-		body: "The internet is not working."
-		internal: false
-'''
-
-RETURN = r'''
-ticket_id:
-	description: The ID of the created support ticket.
+  fqdn:
+    description: The fully qualified domain name of the Zammad instance.
+    required: true
+    type: str
+  endpoint:
+    description: The API endpoint for the ticket management in Zammad.
+    required: true
+    type: str
+  api_user:
+    description: The username for authenticating with the Zammad API.
+    required: true
+    type: str
+  api_secret:
+    description: The password or API key for authenticating with the Zammad API.
+    required: true
+    type: str
+  state:
+    description: The desired state of the ticket. Use 'present' to create or update a ticket, and 'absent' to close a ticket.
+    required: true
+    type: str
+    choices: ["present", "absent"]
+  ticket_id:
+    description: The unique identifier of the ticket to update or close. Required if state is 'absent' or when updating a ticket.
+    required: false
+    type: str
+  customer:
+    description: The email address of the customer for the ticket.
+    required: true
+    type: str
+  title:
+    description: The title of the ticket.
+    required: true
+    type: str
+  group:
+    description: The group handling the ticket.
+    required: true
+    type: str
+  subject:
+    description: The subject for the ticket's article.
+    required: true
+    type: str
+  body:
+    description: The body content for the ticket's article.
+    required: true
+    type: str
+  internal:
+    description: Indicates whether the article is internal. Defaults to false.
+    required: false
+    type: bool
+    default: false
+  ticket_state:
+    description: The state of the ticket (e.g., open, pending, etc.).
+    required: true
+    type: str
+  priority:
+    description: The priority of the ticket (e.g., low, normal, high).
+    required: true
 	type: str
-	returned: always
-	sample: "12345"
-status_code:
-	description: The status code returned by the API.
-	type: int
-	returned: always
-	sample: 200
+
+examples:
+  - name: Create a new ticket
+    zammad_ticket:
+      fqdn: "https://zammad.example.com"
+      endpoint: "/api/v1/tickets"
+      api_user: "api_user"
+      api_secret: "api_secret"
+      state: "present"
+      title: "Internet Outage"
+      group: "Support"
+      customer: "customer@example.com"
+      subject: "Internet is down"
+      body: "The internet is not working since this morning."
+      internal: false
+      ticket_state: "open"
+      priority: "high"
+
+  - name: Update an existing ticket
+    zammad_ticket:
+      fqdn: "https://zammad.example.com"
+      endpoint: "/api/v1/tickets"
+      api_user: "api_user"
+      api_secret: "api_secret"
+      state: "present"
+      ticket_id: "12345"
+      title: "Internet Outage - Follow Up"
+      group: "Support"
+      customer: "customer@example.com"
+      subject: "Update on internet issue"
+      body: "The internet issue is being worked on."
+      internal: true
+      ticket_state: "pending"
+      priority: "normal"
+
+  - name: Close a ticket
+    zammad_ticket:
+      fqdn: "https://zammad.example.com"
+      endpoint: "/api/v1/tickets"
+      api_user: "api_user"
+      api_secret: "api_secret"
+      state: "absent"
+      ticket_id: "12345"
+
+return:
+  ticket_id:
+    description: The ID of the created or updated support ticket.
+    type: str
+    returned: always
+    sample: "12345"
+  status_code:
+    description: The status code returned by the Zammad API.
+    type: int
+    returned: always
+    sample: 200
+  message:
+    description: A message indicating the result of the operation (success or failure).
+    type: str
+    returned: always
+    sample: "Ticket created successfully."
 '''
 
 from ansible.module_utils.basic import AnsibleModule
