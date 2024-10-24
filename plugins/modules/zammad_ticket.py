@@ -21,12 +21,8 @@ description: |
   closure of existing tickets.
 
 options:
-  fqdn:
+  zammad_url:
     description: The fully qualified domain name of the Zammad instance.
-    required: true
-    type: str
-  endpoint:
-    description: The API endpoint for the ticket management in Zammad.
     required: true
     type: str
   api_user:
@@ -83,8 +79,7 @@ options:
 examples:
   - name: Create a new ticket
     zammad_ticket:
-      fqdn: "https://zammad.example.com"
-      endpoint: "/api/v1/tickets"
+	  zammad_url: "https://zammad.example.com"
       api_user: "api_user"
       api_secret: "api_secret"
       state: "present"
@@ -99,8 +94,7 @@ examples:
 
   - name: Update an existing ticket
     zammad_ticket:
-      fqdn: "https://zammad.example.com"
-      endpoint: "/api/v1/tickets"
+	  zammad_url: "https://zammad.example.com"
       api_user: "api_user"
       api_secret: "api_secret"
       state: "present"
@@ -116,8 +110,7 @@ examples:
 
   - name: Close a ticket
     zammad_ticket:
-      fqdn: "https://zammad.example.com"
-      endpoint: "/api/v1/tickets"
+      zammad_url: "https://zammad.example.com"
       api_user: "api_user"
       api_secret: "api_secret"
       state: "absent"
@@ -145,9 +138,9 @@ from ansible.module_utils.basic import AnsibleModule
 import json
 import requests
 
-def make_request(method, fqdn, endpoint, api_user, api_secret, data, ticket_id = ""):
+def make_request(method, zammad_url, api_user, api_secret, data, ticket_id = ""):
     headers = {"Content-type": "application/json"}
-    url = f"{fqdn}{endpoint}" + (f"/{ticket_id}")
+    url = f"{zammad_url}/api/v1/tickets/" + (f"{ticket_id}")
     try:
         response = requests.request(method, url, data=json.dumps(data), headers=headers, auth=(api_user, api_secret))
         response.raise_for_status()
@@ -155,7 +148,7 @@ def make_request(method, fqdn, endpoint, api_user, api_secret, data, ticket_id =
     except requests.exceptions.RequestException as e:
         raise ValueError(f"API request failed: {e}")
 
-def create_ticket(fqdn, endpoint, api_user, api_secret, customer, title, group, subject, body, internal, ticket_state, priority):
+def create_ticket(zammad_url, api_user, api_secret, customer, title, group, subject, body, internal, ticket_state, priority):
 	data = {
 		"title": title,
 		"group": group,
@@ -169,9 +162,9 @@ def create_ticket(fqdn, endpoint, api_user, api_secret, customer, title, group, 
 			"internal": str(internal).lower()
 		}
 	}
-	return make_request("POST", fqdn, endpoint, api_user, api_secret, data)
+	return make_request("POST", zammad_url, api_user, api_secret, data)
 
-def update_ticket(fqdn, endpoint, api_user, api_secret, ticket_id, customer, title, group, subject, body, internal, ticket_state, priority):
+def update_ticket(zammad_url, api_user, api_secret, ticket_id, customer, title, group, subject, body, internal, ticket_state, priority):
 	data = {
 		"title": title,
 		"group": group,
@@ -183,11 +176,11 @@ def update_ticket(fqdn, endpoint, api_user, api_secret, ticket_id, customer, tit
 			"internal": str(internal).lower()
 		}
 	}
-	return make_request("PUT", fqdn, endpoint, api_user, api_secret, data, ticket_id)
+	return make_request("PUT", zammad_url, api_user, api_secret, data, ticket_id)
 
-def close_ticket(fqdn, endpoint, api_user, api_secret, ticket_id):
+def close_ticket(zammad_url, api_user, api_secret, ticket_id):
 	data = {"state": "closed"}
-	return make_request("PUT", fqdn, endpoint, api_user, api_secret, data, ticket_id)
+	return make_request("PUT", zammad_url, api_user, api_secret, data, ticket_id)
 
 def validate_params(module, required_params):
 	if not all(module.params[param] for param in required_params):
@@ -196,8 +189,7 @@ def validate_params(module, required_params):
 def run_module():
 	module_args = dict(
 		state=dict(type="str", required=True, choices=("present", "absent")),
-		fqdn=dict(type="str", required=True),
-		endpoint=dict(type="str", required=True),
+		zammad_url=dict(type="str", required=True),
 		api_user=dict(type="str", required=True),
 		api_secret=dict(type="str", required=True),
 		ticket_id=dict(type="str", required=False),
@@ -234,8 +226,7 @@ def run_module():
 				]
 			)
 			ticket_data, status_code = update_ticket(
-				module.params["fqdn"],
-				module.params["endpoint"],
+				module.params["zammad_url"],
 				module.params["api_user"],
 				module.params["api_secret"],
 				module.params["ticket_id"],
@@ -269,8 +260,7 @@ def run_module():
 				]
 			)
 			ticket_data, status_code = create_ticket(
-				module.params["fqdn"],
-				module.params["endpoint"],
+				module.params["zammad_url"],
 				module.params["api_user"],
 				module.params["api_secret"],
 				module.params["customer"],
@@ -292,8 +282,7 @@ def run_module():
 		elif state == "absent":
 			validate_params(module, ["ticket_id"])
 			ticket_data, status_code = close_ticket(
-				module.params["fqdn"],
-				module.params["endpoint"],
+				module.params["zammad_url"],
 				module.params["api_user"],
 				module.params["api_secret"],
 				module.params["ticket_id"]
