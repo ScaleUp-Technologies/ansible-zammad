@@ -6,8 +6,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 author:
-- Scaleup Technologies
-- Melvin Ziemann (@cloucs)
+- Melvin Ziemann (@cloucs), ScaleUp Technologies GmbH & Co. KG
 
 module: zammad_ticket
 
