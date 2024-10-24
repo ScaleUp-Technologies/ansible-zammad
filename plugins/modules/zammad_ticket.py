@@ -69,10 +69,17 @@ from ansible.module_utils.basic import AnsibleModule
 import json
 import requests
 
+def make_request(method, fqdn, endpoint, api_user, api_secret, data, ticket_id = ""):
+    headers = {"Content-type": "application/json"}
+    url = f"{fqdn}{endpoint}" + (f"/{ticket_id}")
+    try:
+        response = requests.request(method, url, data=json.dumps(data), headers=headers, auth=(api_user, api_secret))
+        response.raise_for_status()
+        return response.json(), response.status_code
+    except requests.exceptions.RequestException as e:
+        raise ValueError(f"API request failed: {e}")
+
 def create_ticket(fqdn, endpoint, api_user, api_secret, customer, title, group, subject, body, internal, ticket_state, priority):
-	headers = {
-		"Content-type": "application/json"
-	}
 	data = {
 		"title": title,
 		"group": group,
@@ -86,18 +93,9 @@ def create_ticket(fqdn, endpoint, api_user, api_secret, customer, title, group, 
 			"internal": str(internal).lower()
 		}
 	}
-
-	try:
-		response = requests.post(f"{fqdn}{endpoint}", data=json.dumps(data), headers=headers, auth=(api_user, api_secret))
-		response.raise_for_status()
-		return response.json(), response.status_code
-	except requests.exceptions.RequestException as e:
-		raise ValueError(f"API request failed: {e}")
+	return make_request("POST", fqdn, endpoint, api_user, api_secret, data)
 
 def update_ticket(fqdn, endpoint, api_user, api_secret, ticket_id, customer, title, group, subject, body, internal, ticket_state, priority):
-	headers = {
-		"Content-type": "application/json"
-	}
 	data = {
 		"title": title,
 		"group": group,
@@ -109,28 +107,15 @@ def update_ticket(fqdn, endpoint, api_user, api_secret, ticket_id, customer, tit
 			"internal": str(internal).lower()
 		}
 	}
-
-	try:
-		response = requests.put(f"{fqdn}{endpoint}/{ticket_id}", data=json.dumps(data), headers=headers, auth=(api_user, api_secret))
-		response.raise_for_status()
-		return response.json(), response.status_code
-	except requests.exceptions.RequestException as e:
-		raise ValueError(f"API request failed: {e}")
+	return make_request("PUT", fqdn, endpoint, api_user, api_secret, data, ticket_id)
 
 def close_ticket(fqdn, endpoint, api_user, api_secret, ticket_id):
-	headers = {
-		"Content-type": "application/json"
-	}
-	data = {
-		"state": "closed"
-	}
+	data = {"state": "closed"}
+	return make_request("PUT", fqdn, endpoint, api_user, api_secret, data, ticket_id)
 
-	try:
-		response = requests.put(f"{fqdn}{endpoint}/{ticket_id}", data=json.dumps(data), headers=headers, auth=(api_user, api_secret))
-		response.raise_for_status()
-		return response.json(), response.status_code
-	except requests.exceptions.RequestException as e:
-		raise ValueError(f"API request failed: {e}")
+def validate_params(module, required_params):
+	if not all(module.params[param] for param in required_params):
+		module.fail_json(msg = "Missing required paramters: " + ", ".join(required_params))
 
 def run_module():
 	module_args = dict(
@@ -144,23 +129,14 @@ def run_module():
 		title=dict(type="str", required=False),
 		group=dict(type="str", required=False),
 		subject=dict(type="str", required=False),
-		body=dict(type="str", required=False),
+		body=dict(type="str", required=False,),
 		internal=dict(type="bool", required=False, default="false"),
 		ticket_state=dict(type="str", required=False),
 		priority=dict(type="str", required=False)
 	)
 
-	result = dict(
-		changed=False,
-		ticket_id="",
-		status_code=0,
-		message=""
-	)
-
-	module = AnsibleModule(
-		argument_spec=module_args,
-		supports_check_mode=True
-	)
+	result = dict(changed = False, ticket_id = "", status_code = 0, message = "")
+	module = AnsibleModule(argument_spec = module_args, supports_check_mode = True)
 
 	if module.check_mode:
 		module.exit_json(**result)
@@ -168,19 +144,19 @@ def run_module():
 	try:
 		state = module.params["state"]
 		if state == "present" and module.params["ticket_id"]:
-			required_params = [
-				module.params["ticket_id"],
-				module.params["customer"],
-				module.params["title"],
-				module.params["group"],
-				module.params["subject"],
-				module.params["body"],
-				module.params["ticket_state"],
-				module.params["priority"]
-			]
-			if not all(required_params):
-				module.fail_json(msg="Missing required paramteres for updating a ticket", **result)
-
+			validate_params(
+				module,
+				[
+					"ticket_id",
+					"customer",
+					"title",
+					"group",
+					"subject",
+					"body",
+					"ticket_state",
+					"priority"
+				]
+			)
 			ticket_data, status_code = update_ticket(
 				module.params["fqdn"],
 				module.params["endpoint"],
@@ -196,25 +172,26 @@ def run_module():
 				module.params["ticket_state"],
 				module.params["priority"]
 			)
-			result["changed"] = True
-			result["ticket_id"] = module.params["ticket_id"]
-			result["status_code"] = status_code
-			result["message"] = "Ticket updated successfully."
-			module.exit_json(**result)
+			result.update({
+				"changed": True,
+				"ticket_id": module.params["ticket_id"],
+				"status_code": status_code,
+				"message": "Ticket updated successfully."
+			})
 
 		elif state == "present":
-			required_params = [
-				module.params["customer"],
-				module.params["title"],
-				module.params["group"],
-				module.params["subject"],
-				module.params["body"],
-				module.params["ticket_state"],
-				module.params["priority"]
-			]
-			if not all(required_params):
-				module.fail_json(msg="Missing required parameters for creating a ticket.", **result)
-
+			validate_params(
+				module,
+				[
+					"customer",
+					"title",
+					"group",
+					"subject",
+					"body",
+					"ticket_state",
+					"priority"
+				]
+			)
 			ticket_data, status_code = create_ticket(
 				module.params["fqdn"],
 				module.params["endpoint"],
@@ -229,16 +206,15 @@ def run_module():
 				module.params["ticket_state"],
 				module.params["priority"]
 			)
-			result["changed"] = True
-			result["ticket_id"] = ticket_data.get("id", "N/A")
-			result["status_code"] = status_code
-			result["message"] = "Ticket created successfully."
-			module.exit_json(**result)
+			result.update({
+				"changed": True,
+				"ticket_id": ticket_data.get("id", "N/A"),
+				"status_code": status_code,
+				"message": "Ticket created successfully."
+			})
 
 		elif state == "absent":
-			if not module.params["ticket_id"]:
-				module.fail_json(msg="ticket_id is required to close a ticket.", **result)
-
+			validate_params(module, ["ticket_id"])
 			ticket_data, status_code = close_ticket(
 				module.params["fqdn"],
 				module.params["endpoint"],
@@ -246,11 +222,14 @@ def run_module():
 				module.params["api_secret"],
 				module.params["ticket_id"]
 			)
-			result["changed"] = True
-			result["ticket_id"] = module.params["ticket_id"]
-			result["status_code"] = status_code
-			result["message"] = "Ticket closed successfully."
-			module.exit_json(**result)
+			result.update({
+				"changed": True,
+				"ticket_id": module.params["ticket_id"],
+				"status_code": status_code,
+				"message": "Ticket closed successfully."
+			})
+
+		module.exit_json(**result)
 
 	except ValueError as e:
 		module.fail_json(msg=str(e), **result)
