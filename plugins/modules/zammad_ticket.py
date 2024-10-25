@@ -41,7 +41,7 @@ options:
   ticket_id:
     description: The unique identifier of the ticket to update or close. Required if state is 'absent' or when updating a ticket.
     required: false
-    type: str
+    type: int
   customer:
     description: The email address of the customer for the ticket.
     required: true
@@ -138,9 +138,9 @@ from ansible.module_utils.basic import AnsibleModule
 import json
 import requests
 
-def make_request(method, zammad_url, api_user, api_secret, data, ticket_id = ""):
+def make_request(method, zammad_url, api_user, api_secret, data, ticket_id = None):
     headers = {"Content-type": "application/json"}
-    url = f"{zammad_url}/api/v1/tickets/" + (f"{ticket_id}")
+    url = f"{zammad_url}/api/v1/tickets/{ticket_id}" if ticket_id is not None else f"{zammad_url}/api/v1/tickets/"
     try:
         response = requests.request(method, url, data=json.dumps(data), headers=headers, auth=(api_user, api_secret))
         response.raise_for_status()
@@ -192,7 +192,7 @@ def run_module():
 		zammad_url=dict(type="str", required=True),
 		api_user=dict(type="str", required=True),
 		api_secret=dict(type="str", required=True),
-		ticket_id=dict(type="str", required=False),
+		ticket_id=dict(type="int", required=False),
 		customer=dict(type="str", required=False),
 		title=dict(type="str", required=False),
 		group=dict(type="str", required=False),
@@ -203,7 +203,7 @@ def run_module():
 		priority=dict(type="str", required=False)
 	)
 
-	result = dict(changed = False, ticket_id = "", status_code = 0, message = "")
+	result = dict(changed = False, ticket_id = None, status_code = 0, message = "")
 	module = AnsibleModule(argument_spec = module_args, supports_check_mode = True)
 
 	if module.check_mode:
