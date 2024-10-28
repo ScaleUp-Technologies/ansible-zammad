@@ -165,17 +165,25 @@ def create_ticket(zammad_url, api_user, api_secret, customer, title, group, subj
 	return make_request("POST", zammad_url, api_user, api_secret, data)
 
 def update_ticket(zammad_url, api_user, api_secret, ticket_id, customer, title, group, subject, body, internal, ticket_state, priority):
-	data = {
-		"title": title,
-		"group": group,
-		"state": ticket_state,
-		"priority": priority,
-		"article": {
+	article = {}
+
+	if body: 
+		article = {
 			"subject": subject,
 			"body": body,
 			"internal": str(internal).lower()
 		}
+
+	data = {
+		**{key: value for key, value in {
+			"title": title,
+			"group": group,
+			"ticket_state": ticket_state,
+			"priority": priority
+		}.items() if value is not None}
+		"article": article,
 	}
+
 	return make_request("PUT", zammad_url, api_user, api_secret, data, ticket_id)
 
 def close_ticket(zammad_url, api_user, api_secret, ticket_id):
@@ -193,14 +201,14 @@ def run_module():
 		api_user=dict(type="str", required=True),
 		api_secret=dict(type="str", required=True),
 		ticket_id=dict(type="int", required=False),
-		customer=dict(type="str", required=False),
-		title=dict(type="str", required=False),
-		group=dict(type="str", required=False),
-		subject=dict(type="str", required=False),
-		body=dict(type="str", required=False,),
-		internal=dict(type="bool", required=False, default="false"),
-		ticket_state=dict(type="str", required=False),
-		priority=dict(type="str", required=False)
+		customer=dict(type="str", required=False, default = None),
+		title=dict(type="str", required=False, default = None),
+		group=dict(type="str", required=False, default = None),
+		subject=dict(type="str", required=False, default = None),
+		body=dict(type="str", required=False, default = None),
+		internal=dict(type="bool", required=False, default = "false"),
+		ticket_state=dict(type="str", required=False, default = None),
+		priority=dict(type="str", required=False, default = None)
 	)
 
 	result = dict(changed = False, ticket_id = None, status_code = 0, message = "")
@@ -212,19 +220,7 @@ def run_module():
 	try:
 		state = module.params["state"]
 		if state == "present" and module.params["ticket_id"]:
-			validate_params(
-				module,
-				[
-					"ticket_id",
-					"customer",
-					"title",
-					"group",
-					"subject",
-					"body",
-					"ticket_state",
-					"priority"
-				]
-			)
+			validate_params(module,["ticket_id"])
 			ticket_data, status_code = update_ticket(
 				module.params["zammad_url"],
 				module.params["api_user"],
