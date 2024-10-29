@@ -138,9 +138,9 @@ from ansible.module_utils.basic import AnsibleModule
 import json
 import requests
 
-def make_request(method, zammad_url, api_user, api_secret, data, ticket_id = None):
+def make_request(method, zammad_url, api_user, api_secret, data, ticket_id = None, endpoint = None):
     headers = {"Content-type": "application/json"}
-    url = f"{zammad_url}/api/v1/tickets/{ticket_id}" if ticket_id is not None else f"{zammad_url}/api/v1/tickets/"
+    url = f"{zammad_url}/api/v1/tickets/{ticket_id}" if ticket_id else f"{zammad_url}/api/v1/{endpoint or 'tickets/'}"
     try:
         response = requests.request(method, url, data=json.dumps(data), headers=headers, auth=(api_user, api_secret))
         response.raise_for_status()
@@ -175,24 +175,75 @@ def update_ticket(zammad_url, api_user, api_secret, ticket_id, customer, title, 
 		}
 
 	data = {
+		"article": article,
 		**{key: value for key, value in {
 			"title": title,
 			"group": group,
 			"ticket_state": ticket_state,
 			"priority": priority
 		}.items() if value is not None}
-		"article": article,
 	}
-
 	return make_request("PUT", zammad_url, api_user, api_secret, data, ticket_id)
 
 def close_ticket(zammad_url, api_user, api_secret, ticket_id):
 	data = {"state": "closed"}
 	return make_request("PUT", zammad_url, api_user, api_secret, data, ticket_id)
 
+def get_ticket(zammad_url, api_user, api_secret, ticket_id):
+	return make_request("GET", zammad_url, api_user, api_secret, {}, ticket_id)
+
+def get_customers(zammad_url, api_user, api_secret):
+	return make_request("GET", zammad_url, api_user, api_secret, {}, endpoint = "users")
+
+def get_customer_name(ticket_data, customers):
+	customer_id = ticket_data.get("customer_id")
+	for customer in customers:
+		if customer["id"] == customer_id:
+			return customer["firstname"] + " " + customer["lastname"]
+
+def get_groups(zammad_url, api_user, api_secret):
+	return make_request("GET", zammad_url, api_user, api_secret, {}, endpoint = "groups")
+
+def get_group_name(ticket_data, groups):
+	group_id = ticket_data.get("group_id")
+	for group in groups:
+		if group["id"] == group_id:
+			return group["name"]
+
+def get_ticket_states(zammad_url, api_user, api_secret):
+	return make_request("GET", zammad_url, api_user, api_secret, {}, endpoint = "ticket_states")
+
+def	get_ticket_state_name(ticket_data, ticket_states):
+	ticket_state_id = ticket_data.get("state_id")
+	for ticket_state in ticket_states:
+		if ticket_state["id"] == ticket_state_id:
+			return ticket_state["name"]
+
+def get_priorities(zammad_url, api_user, api_secret):
+	return make_request("GET", zammad_url, api_user, api_secret, {}, endpoint = "ticket_priorities")
+
+def get_priority_name(ticket_data, priorities):
+	priority_id = ticket_data.get("priority_id")
+	for priority in priorities:
+		if priority["id"] == priority_id:
+			return priority["name"]
+
+def get_ticket_articles(zammad_url, api_user, api_secret, ticket_id):
+	return make_request("GET", zammad_url, api_user, api_secret, {}, endpoint = f"ticket_articles/by_ticket/{ticket_id}")
+
+def get_last_article_data(ticket_articles, article_object):
+	return ticket_articles[-1][f"{article_object}"]
+
 def validate_params(module, required_params):
 	if not all(module.params[param] for param in required_params):
 		module.fail_json(msg = "Missing required paramters: " + ", ".join(required_params))
+
+def has_changes(current_ticket_data, ticket_data):
+	for key, value in ticket_data.items():
+		if value is not None:
+			if current_ticket_data.get(key) != value:
+				return True
+	return False
 
 def run_module():
 	module_args = dict(
@@ -218,29 +269,97 @@ def run_module():
 		module.exit_json(**result)
 
 	try:
+		customers, status_code = get_customers(
+			module.params["zammad_url"],
+			module.params["api_user"],
+			module.params["api_secret"]
+		)
+
+		groups, status_code = get_groups(
+			module.params["zammad_url"],
+			module.params["api_user"],
+			module.params["api_secret"]
+		)
+
+		ticket_states, status_code = get_ticket_states(
+			module.params["zammad_url"],
+			module.params["api_user"],
+			module.params["api_secret"]
+		)
+
+		priorities, status_code = get_priorities(
+			module.params["zammad_url"],
+			module.params["api_user"],
+			module.params["api_secret"]
+		)
+
 		state = module.params["state"]
 		if state == "present" and module.params["ticket_id"]:
-			validate_params(module,["ticket_id"])
-			ticket_data, status_code = update_ticket(
+			validate_params(module, ["ticket_id"])
+
+			ticket_data, status_code = get_ticket(
 				module.params["zammad_url"],
 				module.params["api_user"],
 				module.params["api_secret"],
-				module.params["ticket_id"],
-				module.params["customer"],
-				module.params["title"],
-				module.params["group"],
-				module.params["subject"],
-				module.params["body"],
-				module.params["internal"],
-				module.params["ticket_state"],
-				module.params["priority"]
+				module.params["ticket_id"]
 			)
-			result.update({
-				"changed": True,
-				"ticket_id": module.params["ticket_id"],
-				"status_code": status_code,
-				"message": "Ticket updated successfully."
-			})
+
+			ticket_articles, status_code = get_ticket_articles(
+				module.params["zammad_url"],
+				module.params["api_user"],
+				module.params["api_secret"],
+				module.params["ticket_id"]
+			)
+
+			current_ticket_data = {
+				"customer": get_customer_name(ticket_data, customers),
+				"title": ticket_data["title"],
+				"group": get_group_name(ticket_data, groups),
+				"subject": get_last_article_data(ticket_articles, "subject"),
+				"body": get_last_article_data(ticket_articles, "body"),
+				"internal": str(get_last_article_data(ticket_articles, "internal")).lower(),
+				"ticket_state": get_ticket_state_name(ticket_data, ticket_states),
+				"priority": get_priority_name(ticket_data, priorities)
+			}
+
+			ticket_data = {
+				"customer": module.params["customer"],
+				"title": module.params["title"],
+				"group": module.params["group"],
+				"subject": module.params["subject"],
+				"body": module.params["body"],
+				"internal": str(module.params["internal"]).lower(),
+				"ticket_state": module.params["ticket_state"],
+				"priority": module.params["priority"]
+			}
+
+			if has_changes(current_ticket_data, ticket_data):
+				ticket_data, status_code = update_ticket(
+					module.params["zammad_url"],
+					module.params["api_user"],
+					module.params["api_secret"],
+					module.params["ticket_id"],
+					module.params["customer"],
+					module.params["title"],
+					module.params["group"],
+					module.params["subject"],
+					module.params["body"],
+					module.params["internal"],
+					module.params["ticket_state"],
+					module.params["priority"]
+				)
+				result.update({
+					"changed": True,
+					"ticket_id": module.params["ticket_id"],
+					"status_code": status_code,
+					"message": "Ticket updated successfully."
+				})
+			else:
+				result.update({
+					"changed": False,
+					"ticket_id": module.params["ticket_id"],
+					"message": "No changes required."
+				})
 
 		elif state == "present":
 			validate_params(
@@ -276,19 +395,41 @@ def run_module():
 			})
 
 		elif state == "absent":
-			validate_params(module, ["ticket_id"])
-			ticket_data, status_code = close_ticket(
+			ticket_data, status_code = get_ticket(
 				module.params["zammad_url"],
 				module.params["api_user"],
 				module.params["api_secret"],
 				module.params["ticket_id"]
 			)
-			result.update({
-				"changed": True,
-				"ticket_id": module.params["ticket_id"],
-				"status_code": status_code,
-				"message": "Ticket closed successfully."
-			})
+
+			current_ticket_data = {
+				"ticket_state": get_ticket_state_name(ticket_data, ticket_states),
+			}
+
+			ticket_data = {
+				"ticket_state": module.params["ticket_state"],
+			}
+
+			if has_changes(current_ticket_data, ticket_data):
+				validate_params(module, ["ticket_id"])
+				ticket_data, status_code = close_ticket(
+					module.params["zammad_url"],
+					module.params["api_user"],
+					module.params["api_secret"],
+					module.params["ticket_id"]
+				)
+				result.update({
+					"changed": True,
+					"ticket_id": module.params["ticket_id"],
+					"status_code": status_code,
+					"message": "Ticket closed successfully."
+				})
+			else:
+				result.update({
+					"changed": False,
+					"ticket_id": module.params["ticket_id"],
+					"message": "Ticket is already closed."
+				})
 
 		module.exit_json(**result)
 
