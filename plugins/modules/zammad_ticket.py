@@ -42,6 +42,10 @@ options:
     description: The unique identifier of the ticket to update or close. Required if state is 'absent' or when updating a ticket.
     required: false
     type: int
+  owner:
+    description: The Name of the owner for the ticket
+	required: false
+	type: str
   customer:
     description: The email address of the customer for the ticket.
     required: true
@@ -148,35 +152,45 @@ def make_request(method, zammad_url, api_user, api_secret, data, ticket_id = Non
     except requests.exceptions.RequestException as e:
         raise ValueError(f"API request failed: {e}")
 
-def create_ticket(zammad_url, api_user, api_secret, customer, title, group, subject, body, internal, ticket_state, priority):
-	data = {
-		"title": title,
-		"group": group,
-		"state": ticket_state,
-		"customer": customer,
-		"priority": priority,
-		"article": {
-			"subject": subject,
-			"body": body,
-			"type": "note",
-			"internal": str(internal).lower()
-		}
+def create_ticket(zammad_url, api_user, api_secret, owner, customer, title, group, subject, body, internal, ticket_state, priority):
+	article = {
+		"subject": subject,
+		"body": body,
+		"type": "note",
+		"internal": str(internal).lower()
 	}
+
+	data = {
+		"article": article,
+		**{key: value for key, value in {
+			"owner_id": owner,
+			"title": title,
+			"group": group,
+			"state": ticket_state,
+			"customer": customer,
+			"priority": priority
+		}.items() if value is not None}
+	}
+
+	print(data)
+
 	return make_request("POST", zammad_url, api_user, api_secret, data)
 
-def update_ticket(zammad_url, api_user, api_secret, ticket_id, customer, title, group, subject, body, internal, ticket_state, priority):
+def update_ticket(zammad_url, api_user, api_secret, ticket_id, owner, customer, title, group, subject, body, internal, ticket_state, priority):
 	article = {}
 
 	if body: 
 		article = {
 			"subject": subject,
 			"body": body,
+			"type": "note",
 			"internal": str(internal).lower()
 		}
 
 	data = {
 		"article": article,
 		**{key: value for key, value in {
+			"owner_id": owner,
 			"title": title,
 			"group": group,
 			"ticket_state": ticket_state,
@@ -192,7 +206,7 @@ def close_ticket(zammad_url, api_user, api_secret, ticket_id):
 def get_ticket(zammad_url, api_user, api_secret, ticket_id):
 	return make_request("GET", zammad_url, api_user, api_secret, {}, ticket_id)
 
-def get_customers(zammad_url, api_user, api_secret):
+def get_users(zammad_url, api_user, api_secret):
 	return make_request("GET", zammad_url, api_user, api_secret, {}, endpoint = "users")
 
 def get_customer_name(ticket_data, customers):
@@ -200,6 +214,20 @@ def get_customer_name(ticket_data, customers):
 	for customer in customers:
 		if customer["id"] == customer_id:
 			return customer["firstname"] + " " + customer["lastname"]
+
+def get_owner_name(ticket_data, owners):
+	owner_id = ticket_data.get("owner_id")
+	for owner in owners:
+		if owner["id"] == owner_id:
+			return owner["firstname"] + " " + owner["lastname"]
+
+def get_owner_id(owner_name, owners):
+	if owner_name == None:
+		return
+	firstname, lastname = owner_name.split()
+	for owner in owners:
+		if owner["firstname"] == firstname and owner["lastname"] == lastname:
+			return owner["id"]
 
 def get_groups(zammad_url, api_user, api_secret):
 	return make_request("GET", zammad_url, api_user, api_secret, {}, endpoint = "groups")
@@ -252,6 +280,7 @@ def run_module():
 		api_user=dict(type="str", required=True),
 		api_secret=dict(type="str", required=True),
 		ticket_id=dict(type="int", required=False),
+		owner=dict(type="str", required=False, default = None),
 		customer=dict(type="str", required=False, default = None),
 		title=dict(type="str", required=False, default = None),
 		group=dict(type="str", required=False, default = None),
@@ -269,7 +298,7 @@ def run_module():
 		module.exit_json(**result)
 
 	try:
-		customers, status_code = get_customers(
+		users, status_code = get_users(
 			module.params["zammad_url"],
 			module.params["api_user"],
 			module.params["api_secret"]
@@ -312,7 +341,8 @@ def run_module():
 			)
 
 			current_ticket_data = {
-				"customer": get_customer_name(ticket_data, customers),
+				"owner": get_owner_name(ticket_data, users),
+				"customer": get_customer_name(ticket_data, users),
 				"title": ticket_data["title"],
 				"group": get_group_name(ticket_data, groups),
 				"subject": get_last_article_data(ticket_articles, "subject"),
@@ -323,6 +353,7 @@ def run_module():
 			}
 
 			ticket_data = {
+				"owner": module.params["owner"],
 				"customer": module.params["customer"],
 				"title": module.params["title"],
 				"group": module.params["group"],
@@ -339,6 +370,7 @@ def run_module():
 					module.params["api_user"],
 					module.params["api_secret"],
 					module.params["ticket_id"],
+					get_owner_id(module.params["owner"], users),
 					module.params["customer"],
 					module.params["title"],
 					module.params["group"],
@@ -378,6 +410,7 @@ def run_module():
 				module.params["zammad_url"],
 				module.params["api_user"],
 				module.params["api_secret"],
+				get_owner_id(module.params["owner"], users),
 				module.params["customer"],
 				module.params["title"],
 				module.params["group"],
