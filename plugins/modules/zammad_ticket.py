@@ -10,42 +10,48 @@ author:
 
 module: zammad_ticket
 
-short_description: Create, update, close a Zammad ticket via the API
+short_description: Create, update, or close a Zammad ticket via the API
 
 version_added: "1.0.0"
 
 description: |
-  This module creates, updates, or closes a Zammad ticket using the API.
-  User credentials and ticket details are passed as parameters. This module can handle
-  ticket creation and updates based on the specified state. It also allows for the
-  closure of existing tickets.
+  This module allows you to create, update, or close a Zammad ticket using the Zammad API.
+  User credentials and ticket details are passed as parameters. You can create or update a ticket 
+  based on the desired state `present`, or close a ticket with `absent`. When updating or creating, 
+  you can define various parameters like the ticket owner, customer, title, body, priority, etc. 
+  The module handles interaction with the Zammad API to perform the requested actions
 
 options:
-  zammad_url:
-    description: The fully qualified domain name of the Zammad instance.
+  zammad_access:
+    description: Dictionary containing the Zammad API credentials.
     required: true
-    type: str
-  api_user:
-    description: The username for authenticating with the Zammad API.
-    required: true
-    type: str
-  api_secret:
-    description: The password or API key for authenticating with the Zammad API.
-    required: true
-    type: str
+    type: dict
+    suboptions:
+      zammad_url:
+        description: The fully qualified domain name of the Zammad instance (e.g., https://zammad.example.com).
+        required: true
+        type: str
+      api_user:
+        description: The username used to authenticate with the Zammad API.
+        required: true
+        type: str
+      api_secret:
+        description: The password or API key used to authenticate with the Zammad API.
+        required: true
+        type: str
   state:
     description: The desired state of the ticket. Use 'present' to create or update a ticket, and 'absent' to close a ticket.
     required: true
     type: str
     choices: ["present", "absent"]
   ticket_id:
-    description: The unique identifier of the ticket to update or close. Required if state is 'absent' or when updating a ticket.
+    description: The unique identifier of the ticket to update or close. Required when updating or closing an existing ticket.
     required: false
     type: int
   owner:
-    description: The Name of the owner for the ticket
-  required: false
-  type: str
+    description: The name of the owner for the ticket (e.g., 'John Doe'). Only required when creating or updating a ticket.
+    required: false
+    type: str
   customer:
     description: The email address of the customer for the ticket.
     required: true
@@ -55,37 +61,38 @@ options:
     required: true
     type: str
   group:
-    description: The group handling the ticket.
+    description: The group handling the ticket (e.g., 'Support').
     required: true
     type: str
   subject:
-    description: The subject for the ticket's article.
+    description: The subject for the ticket's article (e.g., 'Internet Outage').
     required: true
     type: str
   body:
-    description: The body content for the ticket's article.
+    description: The body content for the ticket's article (e.g., 'The internet is not working since this morning.').
     required: true
     type: str
   internal:
-    description: Indicates whether the article is internal. Defaults to false.
+    description: Indicates whether the article is internal (i.e., visible to agents only). Defaults to false.
     required: false
     type: bool
     default: false
   ticket_state:
-    description: The state of the ticket (e.g., open, pending, etc.).
+    description: The state of the ticket (e.g., 'open', 'pending'). This defines the current state of the ticket.
     required: true
     type: str
   priority:
-    description: The priority of the ticket (e.g., low, normal, high).
+    description: The priority of the ticket (e.g., 'low', 'normal', 'high').
     required: true
-  type: str
+    type: str
 
 examples:
   - name: Create a new ticket
     zammad_ticket:
-    zammad_url: "https://zammad.example.com"
-      api_user: "api_user"
-      api_secret: "api_secret"
+      zammad_access:
+        zammad_url: "https://zammad.example.com"
+        api_user: "api_user"
+        api_secret: "api_secret"
       state: "present"
       title: "Internet Outage"
       group: "Support"
@@ -98,11 +105,12 @@ examples:
 
   - name: Update an existing ticket
     zammad_ticket:
-    zammad_url: "https://zammad.example.com"
-      api_user: "api_user"
-      api_secret: "api_secret"
+      zammad_access:
+        zammad_url: "https://zammad.example.com"
+        api_user: "api_user"
+        api_secret: "api_secret"
       state: "present"
-      ticket_id: "12345"
+      ticket_id: 12345
       title: "Internet Outage - Follow Up"
       group: "Support"
       customer: "customer@example.com"
@@ -114,18 +122,19 @@ examples:
 
   - name: Close a ticket
     zammad_ticket:
-      zammad_url: "https://zammad.example.com"
-      api_user: "api_user"
-      api_secret: "api_secret"
+      zammad_access:
+        zammad_url: "https://zammad.example.com"
+        api_user: "api_user"
+        api_secret: "api_secret"
       state: "absent"
-      ticket_id: "12345"
+      ticket_id: 12345
 
 return:
   ticket_id:
     description: The ID of the created or updated support ticket.
-    type: str
+    type: int
     returned: always
-    sample: "12345"
+    sample: 12345
   status_code:
     description: The status code returned by the Zammad API.
     type: int
@@ -137,7 +146,6 @@ return:
     returned: always
     sample: "Ticket created successfully."
 '''
-
 from ansible.module_utils.basic import AnsibleModule
 import json
 import requests
