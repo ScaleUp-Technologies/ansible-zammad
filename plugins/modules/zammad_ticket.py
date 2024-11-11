@@ -44,8 +44,8 @@ options:
     type: int
   owner:
     description: The Name of the owner for the ticket
-	required: false
-	type: str
+  required: false
+  type: str
   customer:
     description: The email address of the customer for the ticket.
     required: true
@@ -78,12 +78,12 @@ options:
   priority:
     description: The priority of the ticket (e.g., low, normal, high).
     required: true
-	type: str
+  type: str
 
 examples:
   - name: Create a new ticket
     zammad_ticket:
-	  zammad_url: "https://zammad.example.com"
+    zammad_url: "https://zammad.example.com"
       api_user: "api_user"
       api_secret: "api_secret"
       state: "present"
@@ -98,7 +98,7 @@ examples:
 
   - name: Update an existing ticket
     zammad_ticket:
-	  zammad_url: "https://zammad.example.com"
+    zammad_url: "https://zammad.example.com"
       api_user: "api_user"
       api_secret: "api_secret"
       state: "present"
@@ -171,8 +171,6 @@ def create_ticket(zammad_url, api_user, api_secret, owner, customer, title, grou
 			"priority": priority
 		}.items() if value is not None}
 	}
-
-	print(data)
 
 	return make_request("POST", zammad_url, api_user, api_secret, data)
 
@@ -263,6 +261,9 @@ def get_last_article_data(ticket_articles, article_object):
 	return ticket_articles[-1][f"{article_object}"]
 
 def validate_params(module, required_params):
+	zammad_access = module.params.get("zammad_access", {})
+	if not all(zammad_access.get(param) for param in ["zammad_url", "api_user", "api_secret"]):
+		module.fail_json(msg="Missing required zammad_access parameters: zammad_url, api_user, and/or api_secret.")
 	if not all(module.params[param] for param in required_params):
 		module.fail_json(msg = "Missing required paramters: " + ", ".join(required_params))
 
@@ -275,20 +276,26 @@ def has_changes(current_ticket_data, ticket_data):
 
 def run_module():
 	module_args = dict(
+		zammad_access=dict(
+			type="dict",
+			required=True,
+			options=dict(
+				zammad_url=dict(type="str", required=True),
+				api_user=dict(type="str", required=True),
+				api_secret=dict(type="str", required=True)
+			)
+		),
 		state=dict(type="str", required=True, choices=("present", "absent")),
-		zammad_url=dict(type="str", required=True),
-		api_user=dict(type="str", required=True),
-		api_secret=dict(type="str", required=True),
 		ticket_id=dict(type="int", required=False),
-		owner=dict(type="str", required=False, default = None),
-		customer=dict(type="str", required=False, default = None),
-		title=dict(type="str", required=False, default = None),
-		group=dict(type="str", required=False, default = None),
-		subject=dict(type="str", required=False, default = None),
-		body=dict(type="str", required=False, default = None),
-		internal=dict(type="bool", required=False, default = "false"),
-		ticket_state=dict(type="str", required=False, default = None),
-		priority=dict(type="str", required=False, default = None)
+		owner=dict(type="str", required=False, default=None),
+		customer=dict(type="str", required=False, default=None),
+		title=dict(type="str", required=False, default=None),
+		group=dict(type="str", required=False, default=None),
+		subject=dict(type="str", required=False, default=None),
+		body=dict(type="str", required=False, default=None),
+		internal=dict(type="bool", required=False, default="false"),
+		ticket_state=dict(type="str", required=False, default=None),
+		priority=dict(type="str", required=False, default=None)
 	)
 
 	result = dict(changed = False, ticket_id = None, status_code = 0, message = "")
@@ -297,48 +304,23 @@ def run_module():
 	if module.check_mode:
 		module.exit_json(**result)
 
+	zammad_access = module.params["zammad_access"]
+	zammad_url = zammad_access["zammad_url"]
+	api_user = zammad_access["api_user"]
+	api_secret = zammad_access["api_secret"]
+
 	try:
-		users, status_code = get_users(
-			module.params["zammad_url"],
-			module.params["api_user"],
-			module.params["api_secret"]
-		)
-
-		groups, status_code = get_groups(
-			module.params["zammad_url"],
-			module.params["api_user"],
-			module.params["api_secret"]
-		)
-
-		ticket_states, status_code = get_ticket_states(
-			module.params["zammad_url"],
-			module.params["api_user"],
-			module.params["api_secret"]
-		)
-
-		priorities, status_code = get_priorities(
-			module.params["zammad_url"],
-			module.params["api_user"],
-			module.params["api_secret"]
-		)
+		users, status_code = get_users(zammad_url, api_user, api_secret)
+		groups, status_code = get_groups(zammad_url, api_user, api_secret)
+		ticket_states, status_code = get_ticket_states(zammad_url, api_user, api_secret)
+		priorities, status_code = get_priorities(zammad_url, api_user, api_secret)
 
 		state = module.params["state"]
 		if state == "present" and module.params["ticket_id"]:
 			validate_params(module, ["ticket_id"])
 
-			ticket_data, status_code = get_ticket(
-				module.params["zammad_url"],
-				module.params["api_user"],
-				module.params["api_secret"],
-				module.params["ticket_id"]
-			)
-
-			ticket_articles, status_code = get_ticket_articles(
-				module.params["zammad_url"],
-				module.params["api_user"],
-				module.params["api_secret"],
-				module.params["ticket_id"]
-			)
+			ticket_data, status_code = get_ticket(zammad_url, api_user, api_secret, module.params["ticket_id"])
+			ticket_articles, status_code = get_ticket_articles(zammad_url, api_user, api_secret, module.params["ticket_id"])
 
 			current_ticket_data = {
 				"owner": get_owner_name(ticket_data, users),
@@ -366,9 +348,9 @@ def run_module():
 
 			if has_changes(current_ticket_data, ticket_data):
 				ticket_data, status_code = update_ticket(
-					module.params["zammad_url"],
-					module.params["api_user"],
-					module.params["api_secret"],
+					zammad_url,
+					api_user,
+					api_secret,
 					module.params["ticket_id"],
 					get_owner_id(module.params["owner"], users),
 					module.params["customer"],
@@ -394,22 +376,11 @@ def run_module():
 				})
 
 		elif state == "present":
-			validate_params(
-				module,
-				[
-					"customer",
-					"title",
-					"group",
-					"subject",
-					"body",
-					"ticket_state",
-					"priority"
-				]
-			)
+			validate_params(module, ["customer", "title", "group", "subject", "body", "ticket_state", "priority"])
 			ticket_data, status_code = create_ticket(
-				module.params["zammad_url"],
-				module.params["api_user"],
-				module.params["api_secret"],
+				zammad_url,
+				api_user,
+				api_secret,
 				get_owner_id(module.params["owner"], users),
 				module.params["customer"],
 				module.params["title"],
@@ -422,35 +393,21 @@ def run_module():
 			)
 			result.update({
 				"changed": True,
-				"ticket_id": ticket_data.get("id", "N/A"),
+				"ticket_id": ticket_data.get("id"),
 				"status_code": status_code,
 				"message": "Ticket created successfully."
 			})
 
 		elif state == "absent":
-			ticket_data, status_code = get_ticket(
-				module.params["zammad_url"],
-				module.params["api_user"],
-				module.params["api_secret"],
-				module.params["ticket_id"]
-			)
+			ticket_data, status_code = get_ticket(zammad_url, api_user, api_secret, module.params["ticket_id"])
 
-			current_ticket_data = {
-				"ticket_state": get_ticket_state_name(ticket_data, ticket_states),
-			}
+			current_ticket_data = {"ticket_state": get_ticket_state_name(ticket_data, ticket_states)}
 
-			ticket_data = {
-				"ticket_state": module.params["ticket_state"],
-			}
+			ticket_data = {"ticket_state": module.params["ticket_state"]}
 
 			if has_changes(current_ticket_data, ticket_data):
 				validate_params(module, ["ticket_id"])
-				ticket_data, status_code = close_ticket(
-					module.params["zammad_url"],
-					module.params["api_user"],
-					module.params["api_secret"],
-					module.params["ticket_id"]
-				)
+				ticket_data, status_code = close_ticket(zammad_url, api_user, api_secret, module.params["ticket_id"])
 				result.update({
 					"changed": True,
 					"ticket_id": module.params["ticket_id"],
