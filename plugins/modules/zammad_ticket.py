@@ -231,7 +231,7 @@ def get_owner_name(ticket_data, owners):
 def get_owner_id(owner_name, owners):
 	if owner_name == None:
 		return
-	firstname, lastname = owner_name.split()
+	firstname, lastname = owner_name.split(maxsplit=1)
 	for owner in owners:
 		if owner["firstname"] == firstname and owner["lastname"] == lastname:
 			return owner["id"]
