@@ -227,11 +227,11 @@ def get_ticket(module, zammad_url, api_user, api_secret, ticket_id):
 def get_users(module, zammad_url, api_user, api_secret):
 	return make_request(module, "GET", zammad_url, api_user, api_secret, {}, endpoint = "users")
 
-def get_customer_name(ticket_data, customers):
+def get_customer_email(ticket_data, customers):
 	customer_id = ticket_data.get("customer_id")
 	for customer in customers:
 		if customer["id"] == customer_id:
-			return customer["firstname"] + " " + customer["lastname"]
+			return customer["email"]
 
 def get_owner_name(ticket_data, owners):
 	owner_id = ticket_data.get("owner_id")
@@ -344,7 +344,7 @@ def run_module():
 
 			current_ticket_data = {
 				"owner": get_owner_name(ticket_data, users),
-				"customer": get_customer_name(ticket_data, users),
+				"customer": get_customer_email(ticket_data, users),
 				"title": ticket_data["title"],
 				"group": get_group_name(ticket_data, groups),
 				"subject": get_last_article_data(ticket_articles, "subject"),
@@ -398,7 +398,6 @@ def run_module():
 
 		elif state == "present":
 			validate_params(module, ["customer", "title", "group", "subject", "body", "ticket_state", "priority"])
-			print(module.params["priority"])
 			ticket_data, status_code = create_ticket(
 				module,
 				zammad_url,
