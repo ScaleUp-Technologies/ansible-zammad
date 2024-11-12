@@ -128,6 +128,7 @@ examples:
         api_secret: "api_secret"
       state: "absent"
       ticket_id: 12345
+	  ticket_state: "closed"
 
 return:
   ticket_id:
@@ -407,6 +408,7 @@ def run_module():
 			})
 
 		elif state == "absent":
+			validate_params(module, ["ticket_id"])
 			ticket_data, status_code = get_ticket(zammad_url, api_user, api_secret, module.params["ticket_id"])
 
 			current_ticket_data = {"ticket_state": get_ticket_state_name(ticket_data, ticket_states)}
@@ -414,7 +416,6 @@ def run_module():
 			ticket_data = {"ticket_state": module.params["ticket_state"]}
 
 			if has_changes(current_ticket_data, ticket_data):
-				validate_params(module, ["ticket_id"])
 				ticket_data, status_code = close_ticket(zammad_url, api_user, api_secret, module.params["ticket_id"])
 				result.update({
 					"changed": True,
