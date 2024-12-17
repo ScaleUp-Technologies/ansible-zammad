@@ -128,7 +128,7 @@ examples:
         api_secret: "api_secret"
       state: "absent"
       ticket_id: 12345
-	  ticket_state: "closed"
+      ticket_state: "closed"
 
 return:
   ticket_id:
