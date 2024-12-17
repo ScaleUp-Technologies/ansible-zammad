@@ -110,66 +110,66 @@ options:
 """
 
 EXAMPLES = r"""
-  - name: Create a new ticket
-    zammad_ticket:
-      zammad_access:
-        zammad_url: "https://zammad.example.com"
-        api_user: "api_user"
-        api_secret: "api_secret"
-      state: "present"
-      title: "Internet Outage"
-      group: "Support"
-      customer: "customer@example.com"
-      subject: "Internet is down"
-      body: "The internet is not working since this morning."
-      internal: false
-      ticket_state: "open"
-      priority: "high"
+- name: Create a new ticket
+  zammad_ticket:
+    zammad_access:
+      zammad_url: "https://zammad.example.com"
+      api_user: "api_user"
+      api_secret: "api_secret"
+    state: "present"
+    title: "Internet Outage"
+    group: "Support"
+    customer: "customer@example.com"
+    subject: "Internet is down"
+    body: "The internet is not working since this morning."
+    internal: false
+    ticket_state: "open"
+    priority: "high"
 
-  - name: Update an existing ticket
-    zammad_ticket:
-      zammad_access:
-        zammad_url: "https://zammad.example.com"
-        api_user: "api_user"
-        api_secret: "api_secret"
-      state: "present"
-      ticket_id: 12345
-      title: "Internet Outage - Follow Up"
-      group: "Support"
-      customer: "customer@example.com"
-      subject: "Update on internet issue"
-      body: "The internet issue is being worked on."
-      internal: true
-      ticket_state: "pending"
-      priority: "normal"
+- name: Update an existing ticket
+  zammad_ticket:
+    zammad_access:
+      zammad_url: "https://zammad.example.com"
+      api_user: "api_user"
+      api_secret: "api_secret"
+    state: "present"
+    ticket_id: 12345
+    title: "Internet Outage - Follow Up"
+    group: "Support"
+    customer: "customer@example.com"
+    subject: "Update on internet issue"
+    body: "The internet issue is being worked on."
+    internal: true
+    ticket_state: "pending"
+    priority: "normal"
 
-  - name: Close a ticket
-    zammad_ticket:
-      zammad_access:
-        zammad_url: "https://zammad.example.com"
-        api_user: "api_user"
-        api_secret: "api_secret"
-      state: "absent"
-      ticket_id: 12345
-      ticket_state: "closed"
+- name: Close a ticket
+  zammad_ticket:
+    zammad_access:
+      zammad_url: "https://zammad.example.com"
+      api_user: "api_user"
+      api_secret: "api_secret"
+    state: "absent"
+    ticket_id: 12345
+    ticket_state: "closed"
 """
 
 RETURN = r"""
-  ticket_id:
-    description: The ID of the created or updated support ticket.
-    type: int
-    returned: always
-    sample: 12345
-  status_code:
-    description: The status code returned by the Zammad API.
-    type: int
-    returned: always
-    sample: 200
-  message:
-    description: A message indicating the result of the operation (success or failure).
-    type: str
-    returned: always
-    sample: "Ticket created successfully."
+ticket_id:
+  description: The ID of the created or updated support ticket.
+  type: int
+  returned: always
+  sample: 12345
+status_code:
+  description: The status code returned by the Zammad API.
+  type: int
+  returned: always
+  sample: 200
+message:
+  description: A message indicating the result of the operation (success or failure).
+  type: str
+  returned: always
+  sample: "Ticket created successfully."
 """
 
 from ansible.module_utils.basic import AnsibleModule
