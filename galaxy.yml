@@ -8,7 +8,7 @@ name: "zammad_api"
 version: 1.0.0
 readme: README.md
 authors:
-  - Melvin Ziemann (@cloucs) <mziemann@scaleuptech.com>
+  - Melvin Ziemann (@cloucs) <ziemann.melvin@gmail.com>
 
 description: Zammad collection for interacting with the Zammad API
 license_file: LICENSE
