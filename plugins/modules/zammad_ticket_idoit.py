@@ -61,7 +61,7 @@ notes:
 """
 
 EXAMPLES = r"""
-# Example usage of zammad_change_idoit_object module
+# Example usage of zammad_ticket_idoit module
 - name: Associate an i-doit object with a Zammad ticket
   zammad_change_idoit_object:
     zammad_access:
