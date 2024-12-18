@@ -361,6 +361,8 @@ def run_module():
         priority=dict(type="str", required=False, default=None)
     )
 
+    module_args = {**module_args}
+
     result = dict(changed=False, ticket_id=None, status_code=0, message="")
     module = AnsibleModule(argument_spec=module_args, supports_check_mode=True)
 
