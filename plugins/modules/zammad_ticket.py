@@ -173,32 +173,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.urls import fetch_url
-import json
-import base64
-
-
-def make_request(module, method, zammad_url, api_user, api_secret, data, ticket_id=None, endpoint=None):
-    headers = {"Content-type": "application/json"}
-    auth = f"{api_user}:{api_secret}"
-    encoded_auth = base64.b64encode(auth.encode("utf-8")).decode("utf-8")
-    headers["Authorization"] = f"Basic {encoded_auth}"
-    url = f"{zammad_url}/api/v1/tickets/{ticket_id}" if ticket_id else f"{zammad_url}/api/v1/{endpoint or 'tickets/'}"
-    data_json = json.dumps(data) if data else None
-    response, info = fetch_url(
-        module,
-        url,
-        method=method,
-        data=data_json,
-        headers=headers
-    )
-    if info["status"] >= 400:
-        module.fail_json(msg=f"API request failed: {info['msg']}", status_code=info["status"])
-    try:
-        result = json.load(response)
-    except json.JSONDecodeError:
-        module.fail_json(msg="Failed to parse JSON response")
-    return result, info["status"]
+from ansible_collections.scaleuptechnologies.zammad_api.plugins.module_utils.http_request import make_request
 
 
 def create_ticket(module, zammad_url, api_user, api_secret, owner, customer, title, group, subject, body, internal, ticket_state, priority):
@@ -360,6 +335,8 @@ def run_module():
         ticket_state=dict(type="str", required=False, default=None),
         priority=dict(type="str", required=False, default=None)
     )
+
+    module_args = {**module_args}
 
     result = dict(changed=False, ticket_id=None, status_code=0, message="")
     module = AnsibleModule(argument_spec=module_args, supports_check_mode=True)
